@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0407">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="description" content="Cyberpunk-styled world map with live GPS tracking and turn-by-turn navigation. 100% free and open data.">
+  <title>NEON//NAV</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <meta name="apple-mobile-web-app-title" content="NEON//NAV">
+  <meta name="mobile-web-app-capable" content="yes">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap">
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="map" aria-label="Map"></div>
+
+  <!-- screen effects -->
+  <div class="fx fx-grid"></div>
+  <div class="fx fx-vignette"></div>
+  <div class="fx fx-scan"></div>
+  <div class="fx fx-dim"></div>
+  <div class="fx fx-glitch" id="fx-glitch"><i></i><i></i><i></i></div>
+
+  <!-- ░░ boot sequence ░░ -->
+  <div id="boot">
+    <div class="boot-inner">
+      <div class="boot-logo glitch" data-text="NEON//NAV">NEON//NAV</div>
+      <div class="boot-sub">GEOSPATIAL NEURAL LINK · BUILD 2.077</div>
+      <pre id="boot-log" class="mono"></pre>
+      <div class="boot-bar"><i id="boot-progress"></i></div>
+      <button id="jack-in" class="btn btn-primary btn-lg" hidden>[ JACK IN ]</button>
+      <div class="boot-foot mono">TILES © OPENFREEMAP · OPENMAPTILES · OPENSTREETMAP CONTRIBUTORS</div>
+    </div>
+  </div>
+
+  <!-- ░░ top-left: identity + location readout ░░ -->
+  <header class="hud hud-tl">
+    <div class="brand"><span class="brand-mark"></span><b>NEON</b><em>//</em><b>NAV</b><small>v2.077</small></div>
+    <div class="district-wrap">
+      <span class="tag">SECTOR</span>
+      <div class="district glitch-in" id="district">— NO SIGNAL —</div>
+    </div>
+    <div class="readout mono" id="coords">LAT --.------ · LNG ---.------</div>
+  </header>
+
+  <!-- ░░ search ░░ -->
+  <section class="search" id="search">
+    <div class="search-box panel">
+      <span class="prompt mono">&gt;_</span>
+      <input id="q" type="search" placeholder="SET DESTINATION…" autocomplete="off" spellcheck="false" enterkeyhint="search" aria-label="Search destination">
+      <span class="kbd mono">/</span>
+    </div>
+    <ul id="results" class="results panel" role="listbox" hidden></ul>
+  </section>
+
+  <!-- ░░ top-right: telemetry ░░ -->
+  <aside class="hud hud-tr">
+    <div class="clock">
+      <div class="mono time" id="clock">00:00:00</div>
+      <div class="mono date" id="date">--.--.----</div>
+    </div>
+    <div class="gps" id="gps" data-state="off">
+      <span class="bars"><i></i><i></i><i></i><i></i></span>
+      <span id="gps-text">GPS OFFLINE</span>
+    </div>
+    <button class="compass" id="compass" title="Reset north (N)" aria-label="Reset north">
+      <div class="compass-ring" id="compass-ring">
+        <span class="n">N</span><span class="e">E</span><span class="s">S</span><span class="w">W</span>
+      </div>
+      <div class="compass-needle"></div>
+    </button>
+  </aside>
+
+  <!-- ░░ objective tracker (game-style quest line) ░░ -->
+  <aside class="objective" id="objective" hidden>
+    <div class="objective-head"><span class="diamond"></span>OBJECTIVE</div>
+    <div class="objective-title" id="obj-title">Reach destination</div>
+    <div class="objective-dist mono" id="obj-dist">--</div>
+  </aside>
+
+  <!-- ░░ maneuver banner (during navigation) ░░ -->
+  <section class="maneuver panel" id="maneuver" hidden>
+    <div class="maneuver-icon" id="mv-icon"></div>
+    <div class="maneuver-body">
+      <div class="maneuver-dist mono" id="mv-dist">--</div>
+      <div class="maneuver-text" id="mv-text">--</div>
+    </div>
+    <div class="maneuver-then" id="mv-then" hidden><span>THEN</span><div id="mv-then-icon"></div></div>
+  </section>
+
+  <!-- ░░ map controls ░░ -->
+  <nav class="controls" aria-label="Map controls">
+    <button class="ctl" id="btn-follow" title="Track my position (F)" aria-label="Track my position">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4" fill="none" stroke-width="2"/><circle cx="12" cy="12" r="8" fill="none" stroke-width="1.6"/></svg>
+    </button>
+    <button class="ctl" id="btn-heading" title="Heading-up / north-up (H)" aria-label="Toggle heading up">
+      <svg viewBox="0 0 24 24"><path d="M12 2 L19 21 L12 16.5 L5 21 Z"/></svg>
+    </button>
+    <button class="ctl" id="btn-3d" title="Toggle 3D (T)" aria-label="Toggle 3D"><span class="mono">3D</span></button>
+    <button class="ctl" id="btn-zoom-in" title="Zoom in" aria-label="Zoom in"><span class="mono">+</span></button>
+    <button class="ctl" id="btn-zoom-out" title="Zoom out" aria-label="Zoom out"><span class="mono">−</span></button>
+    <button class="ctl" id="btn-dim" title="Night drive dimmer (D)" aria-label="Night drive dimmer">
+      <svg viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></svg>
+    </button>
+    <button class="ctl" id="btn-audio" title="Voice & sound (M)" aria-label="Toggle voice and sound">
+      <svg viewBox="0 0 24 24"><path d="M3 9h4l5-5v16l-5-5H3z"/><path class="wave" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke-width="2"/></svg>
+    </button>
+  </nav>
+
+  <!-- ░░ off-screen waypoint pointer ░░ -->
+  <div class="offscreen" id="offscreen" hidden>
+    <div class="offscreen-arrow" id="offscreen-arrow"></div>
+    <div class="offscreen-dist mono" id="offscreen-dist">--</div>
+  </div>
+
+  <!-- ░░ speedometer ░░ -->
+  <div class="speedo" id="speedo" hidden>
+    <div class="speed mono" id="speed">0</div>
+    <div class="speed-unit">KM/H</div>
+    <div class="speed-arc"><i id="speed-arc"></i></div>
+    <div class="alt mono" id="alt"></div>
+  </div>
+
+  <!-- ░░ route preview / nav bar ░░ -->
+  <section class="sheet panel" id="sheet" hidden>
+    <div class="sheet-head">
+      <span class="tag tag-yellow" id="sheet-tag">// ROUTE PLOTTED</span>
+      <button class="icon-btn" id="btn-close" aria-label="Cancel route">✕</button>
+    </div>
+    <div class="dest">
+      <div class="dest-title" id="dest-title">—</div>
+      <div class="dest-sub" id="dest-sub"></div>
+    </div>
+    <div class="modes" role="tablist">
+      <button class="mode" data-mode="car" role="tab">
+        <svg viewBox="0 0 24 24"><path d="M5 11l1.6-4.6A2 2 0 0 1 8.5 5h7a2 2 0 0 1 1.9 1.4L19 11a2 2 0 0 1 2 2v4h-2v2h-3v-2H8v2H5v-2H3v-4a2 2 0 0 1 2-2zm2.1 0h9.8l-1.1-3.4a1 1 0 0 0-.9-.6H9.1a1 1 0 0 0-.9.6zM6.5 15.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zm11 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/></svg>
+        DRIVE</button>
+      <button class="mode" data-mode="bike" role="tab">
+        <svg viewBox="0 0 24 24"><path d="M5 20a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm0-2a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm14 2a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm0-2a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM12 7.5a1.75 1.75 0 1 1 0-3.5 1.75 1.75 0 0 1 0 3.5zM10.4 9.6 8.6 11.5l2.4 2V19h-2v-4.6l-3-2.6a1.2 1.2 0 0 1 0-1.8l3.5-3.4a1.4 1.4 0 0 1 2 0l2.2 2.4H17v2h-3.8z"/></svg>
+        RIDE</button>
+      <button class="mode" data-mode="foot" role="tab">
+        <svg viewBox="0 0 24 24"><path d="M13.5 5.5a2 2 0 1 1 0-4 2 2 0 0 1 0 4zM9.8 8.9 7 10.3V14H5V9.1l4.5-2.2c.5-.2 1-.3 1.4-.2l1.1.2c.6.1 1.2.5 1.5 1.1l1.4 2.7c.6 1.1 1.8 1.9 3.1 1.9v2c-1.9 0-3.6-.9-4.7-2.3l-.7 3.4 2.4 2.3V22h-2v-5.3l-2.1-2L9.9 22H7.8z"/></svg>
+        WALK</button>
+    </div>
+    <div class="stats">
+      <div class="stat"><span class="label">DISTANCE</span><span class="value mono" id="st-dist">--</span></div>
+      <div class="stat"><span class="label">TIME</span><span class="value mono" id="st-time">--</span></div>
+      <div class="stat"><span class="label">ARRIVAL</span><span class="value mono" id="st-eta">--:--</span></div>
+    </div>
+    <div class="actions">
+      <button class="btn btn-primary" id="btn-engage">ENGAGE</button>
+      <button class="btn" id="btn-sim" title="Simulate driving the route (S)">SIM</button>
+    </div>
+    <div class="loading mono" id="sheet-loading" hidden><i></i>CALCULATING ROUTE…</div>
+  </section>
+
+  <!-- ░░ overlays ░░ -->
+  <div class="arrival" id="arrival" hidden>
+    <div class="arrival-inner">
+      <div class="arrival-k">// OBJECTIVE COMPLETE</div>
+      <div class="arrival-title glitch" data-text="DESTINATION REACHED">DESTINATION REACHED</div>
+      <div class="arrival-sub mono" id="arrival-sub"></div>
+    </div>
+  </div>
+  <div class="ctxmenu panel" id="ctxmenu" hidden>
+    <div class="mono ctx-coords" id="ctx-coords"></div>
+    <button class="btn btn-primary btn-sm" id="ctx-go">SET WAYPOINT</button>
+    <button class="btn btn-sm" id="ctx-start">START HERE</button>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <div class="sim-badge mono" id="sim-badge" hidden>● SIMULATION</div>
+
+  <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
