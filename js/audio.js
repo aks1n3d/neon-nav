@@ -2,15 +2,13 @@
 
 let ctx = null;
 let enabled = true;
-let voice = null;
+let profile = { gender: 'female', pitch: 0.75, rate: 1.03, prefer: [] };
 
 export function initAudio() {
   try {
     ctx ??= new (window.AudioContext || window.webkitAudioContext)();
     if (ctx.state === 'suspended') ctx.resume();
   } catch { ctx = null; }
-  pickVoice();
-  window.speechSynthesis?.addEventListener?.('voiceschanged', pickVoice);
 }
 
 export function setAudio(on) {
@@ -18,10 +16,22 @@ export function setAudio(on) {
   if (!on) window.speechSynthesis?.cancel();
 }
 
-function pickVoice() {
-  const voices = window.speechSynthesis?.getVoices() ?? [];
-  const en = voices.filter((v) => v.lang?.startsWith('en'));
-  voice = en.find((v) => /samantha|google us english|zira|aria|jenny/i.test(v.name)) || en[0] || null;
+export function setVoiceProfile(p) { profile = p; }
+
+const MALE = /\b(male|daniel|arthur|fred|alex|aaron|guy|ryan|david|mark|george|rishi|oliver|gordon|tom|evan|nathan|reed|rocko|eddy|ralph|albert|junior)\b/i;
+const FEMALE = /\b(female|samantha|karen|moira|tessa|zira|aria|jenny|sonia|serena|victoria|allison|ava|susan|fiona|kate|nicky|hazel|martha|shelley|sandy|flo|kathy|libby|emma)\b/i;
+const GOOGLE_US = /google us english/i; // Chrome's US voice is female
+
+export function voiceFor(p = profile) {
+  const all = window.speechSynthesis?.getVoices() ?? [];
+  const en = all.filter((v) => /^en/i.test(v.lang));
+  for (const re of p.prefer) {
+    const hits = en.filter((x) => re.test(x.name));
+    if (hits.length) return hits.find((x) => /^en[-_]US/i.test(x.lang)) || hits[0];
+  }
+  const isMale = (v) => MALE.test(v.name) && !FEMALE.test(v.name);
+  const isFemale = (v) => FEMALE.test(v.name) || GOOGLE_US.test(v.name);
+  return en.find(p.gender === 'male' ? isMale : isFemale) || en.find((v) => v.default) || en[0] || null;
 }
 
 function tone(freq, dur, { type = 'square', vol = 0.035, delay = 0, slide = 0 } = {}) {
@@ -69,13 +79,20 @@ export const sfx = {
   arrive: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.18, { type: 'triangle', vol: 0.05, delay: i * 0.09 })),
 };
 
-export function speak(text) {
-  if (!enabled || !window.speechSynthesis) return;
+export function speak(text, { onstart, onend } = {}) {
+  if (!enabled || !window.speechSynthesis || !text) return;
   speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
-  if (voice) u.voice = voice;
-  u.lang = voice?.lang || 'en-US';
-  u.rate = 1.03;
-  u.pitch = 0.75;
+  const v = voiceFor();
+  if (v) u.voice = v;
+  u.lang = v?.lang || 'en-US';
+  u.rate = profile.rate;
+  u.pitch = profile.pitch;
+  // onend is unreliable on some browsers, so also stop after a generous estimate
+  let done = false;
+  const finish = () => { if (!done) { done = true; onend?.(); } };
+  const fallback = setTimeout(finish, 1500 + text.length * 90 / profile.rate);
+  u.onstart = () => onstart?.();
+  u.onend = u.onerror = () => { clearTimeout(fallback); finish(); };
   speechSynthesis.speak(u);
 }

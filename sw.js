@@ -1,9 +1,9 @@
 // App-shell cache. App files: network first (always fresh when online),
 // falling back to cache offline. Map engine + fonts: stale-while-revalidate.
 // Tiles, routing and search are never cached here.
-const CACHE = 'neonnav-v2';
+const CACHE = 'neonnav-v3';
 const SHELL = ['./', 'index.html', 'css/style.css', 'js/app.js', 'js/mapstyle.js', 'js/geo.js',
-  'js/router.js', 'js/geocode.js', 'js/audio.js', 'icon.svg', 'icon-180.png', 'manifest.webmanifest'];
+  'js/router.js', 'js/geocode.js', 'js/audio.js', 'js/personas.js', 'icon.svg', 'icon-180.png', 'manifest.webmanifest'];
 const CDN = ['unpkg.com', 'fonts.googleapis.com', 'fonts.gstatic.com'];
 
 self.addEventListener('install', (e) => {

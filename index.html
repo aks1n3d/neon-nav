@@ -110,6 +110,9 @@
     <button class="ctl" id="btn-dim" title="Night drive dimmer (D)" aria-label="Night drive dimmer">
       <svg viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></svg>
     </button>
+    <button class="ctl" id="btn-voice" title="Navigator voice (V)" aria-label="Choose navigator voice">
+      <svg viewBox="0 0 24 24"><path d="M3 10h2v4H3zM7 6h2v12H7zM11 3h2v18h-2zM15 7h2v10h-2zM19 10h2v4h-2z"/></svg>
+    </button>
     <button class="ctl" id="btn-audio" title="Voice & sound (M)" aria-label="Toggle voice and sound">
       <svg viewBox="0 0 24 24"><path d="M3 9h4l5-5v16l-5-5H3z"/><path class="wave" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke-width="2"/></svg>
     </button>
@@ -174,6 +177,15 @@
     <div class="mono ctx-coords" id="ctx-coords"></div>
     <button class="btn btn-primary btn-sm" id="ctx-go">SET WAYPOINT</button>
     <button class="btn btn-sm" id="ctx-start">START HERE</button>
+  </div>
+  <section class="voices panel" id="voices" hidden>
+    <div class="sheet-head"><span class="tag tag-yellow">// NAVIGATOR VOICE</span><button class="icon-btn" id="voices-close" aria-label="Close">✕</button></div>
+    <ul class="voice-list" id="voice-list" role="listbox"></ul>
+    <p class="voices-note">Fan-tribute personas with original lines. Voices are your device's built-in speech, not the original actors.</p>
+  </section>
+  <div class="holo" id="holo" hidden>
+    <div class="holo-glyph"><span id="holo-glyph"></span></div>
+    <div class="holo-body"><div class="holo-name" id="holo-name"></div><div class="holo-wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <div class="sim-badge mono" id="sim-badge" hidden>● SIMULATION</div>

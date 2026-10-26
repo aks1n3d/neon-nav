@@ -566,3 +566,56 @@ body[data-dim='2'] .fx-scan::after { display: none; }
   .sim-badge, body.navigating .sim-badge { top: calc(var(--sat) + 10px); bottom: auto; left: 50%; transform: translateX(-50%); }
   .maplibregl-ctrl-bottom-left { display: none; }
 }
+
+/* ═══ navigator personas ═══════════════════════════════════════ */
+.voices {
+  position: fixed; z-index: 45; right: calc(var(--gutter) + 58px); top: 50%; transform: translateY(-50%);
+  width: 350px; max-height: calc(100vh - 40px); padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 8px;
+  animation: sheet-in 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+.voice-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--red) transparent; }
+.voice-list li {
+  display: grid; grid-template-columns: 34px 1fr auto; gap: 12px; align-items: center;
+  padding: 8px 8px; cursor: pointer; border-left: 2px solid transparent;
+}
+.voice-list li:hover { background: var(--red-faint); }
+.voice-list li.sel { background: color-mix(in srgb, var(--c) 14%, transparent); border-left-color: var(--c); }
+.v-glyph, .holo-glyph {
+  width: 30px; height: 30px; display: grid; place-items: center; transform: rotate(45deg);
+  border: 1.5px solid var(--c); box-shadow: 0 0 10px color-mix(in srgb, var(--c) 50%, transparent);
+}
+.v-glyph span, .holo-glyph span { transform: rotate(-45deg); font-family: var(--f-head); font-weight: 800; font-size: 13px; color: var(--c); }
+.voice-list li.sel .v-glyph { background: var(--c); }
+.voice-list li.sel .v-glyph span { color: #000; }
+.v-body { display: flex; flex-direction: column; min-width: 0; }
+.v-name { font-family: var(--f-head); font-weight: 800; font-size: 13px; letter-spacing: 0.14em; color: var(--c); }
+.v-role { font-size: 13px; color: var(--muted); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v-voice { font-size: 10px; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
+.voices-note { margin: 0; font-size: 11px; line-height: 1.35; color: var(--muted); font-weight: 500; }
+
+/* holo-call: who is talking right now */
+.holo {
+  position: fixed; z-index: 30; top: calc(var(--sat) + 16px); left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 14px; padding: 8px 18px 8px 12px; pointer-events: none;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--c) 22%, rgba(10, 4, 7, 0.85)), rgba(10, 4, 7, 0.85));
+  border-left: 3px solid var(--c);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+  animation: holo-in 0.25s steps(4) 1;
+}
+@keyframes holo-in { from { opacity: 0; transform: translateX(-50%) scaleY(0.2); filter: hue-rotate(90deg); } }
+.holo-name { font-family: var(--f-head); font-weight: 800; font-size: 12px; letter-spacing: 0.2em; color: var(--c); }
+.holo-wave { display: flex; align-items: center; gap: 3px; height: 14px; margin-top: 3px; }
+.holo-wave i { width: 3px; height: 100%; background: var(--c); animation: wave 0.7s ease-in-out infinite; }
+.holo-wave i:nth-child(2n) { animation-delay: -0.2s; } .holo-wave i:nth-child(3n) { animation-delay: -0.45s; } .holo-wave i:nth-child(5n) { animation-delay: -0.1s; }
+@keyframes wave { 0%, 100% { transform: scaleY(0.2); } 50% { transform: scaleY(1); } }
+body.navigating .holo { top: calc(var(--sat) + 132px); }
+
+@media (max-width: 720px) {
+  .voices { left: 8px; right: 8px; width: auto; top: auto; bottom: calc(var(--sab) + 8px); transform: none; max-height: 70vh; }
+  body.navigating .holo { top: calc(var(--sat) + 118px); }
+}
+@media (orientation: landscape) and (max-height: 540px) {
+  .voices { left: auto; right: calc(var(--sar) + 12px); width: 340px; top: calc(var(--sat) + 8px); bottom: calc(var(--sab) + 66px); transform: none; max-height: none; }
+  .holo, body.navigating .holo { top: calc(var(--sat) + 40px); left: auto; right: calc(var(--sar) + 80px); transform: none; }
+  @keyframes holo-in { from { opacity: 0; transform: scaleY(0.2); } }
+}

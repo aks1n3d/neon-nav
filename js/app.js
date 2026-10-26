@@ -4,7 +4,8 @@ import { buildStyle, LABEL_ANCHOR, COLORS } from './mapstyle.js';
 import * as G from './geo.js';
 import { fetchRoute, maneuverIcon } from './router.js';
 import { search, reverse } from './geocode.js';
-import { sfx, speak, initAudio, setAudio } from './audio.js';
+import { sfx, speak, initAudio, setAudio, setVoiceProfile, voiceFor } from './audio.js';
+import { PERSONAS, personaById } from './personas.js';
 
 const $ = (s) => document.querySelector(s);
 const store = {
@@ -31,6 +32,7 @@ const S = {
   mode: store.get('mode', 'car'),
   audio: store.get('audio', true),
   dim: store.get('dim', 0),
+  persona: store.get('persona', 'neon'),
   dest: null,
   route: null,
   nav: null,
@@ -257,6 +259,7 @@ function ingest(fix) {
 function onFirstFix(fix) {
   sfx.lock();
   toast('SATELLITE LOCK ACQUIRED', 'info');
+  say(persona().lock());
   if (S.route) return; // user is already looking at a planned route
   S.flying = true;
   map.flyTo({ center: fix.lnglat, zoom: 16.4, pitch: S.is3d ? 58 : 0, bearing: 0, duration: 5200, curve: 1.6, essential: true });
@@ -688,7 +691,8 @@ function clearRoute() {
 // ═══ navigation ════════════════════════════════════════════════════
 function engage() {
   if (!S.route) return;
-  S.nav = { hint: 0, off: 0, lastReroute: 0, announced: new Set(), progress: null };
+  // quietUntil: let the persona's intro finish before the first turn prompt
+  S.nav = { hint: 0, off: 0, lastReroute: 0, announced: new Set(), progress: null, quietUntil: Date.now() + 6000 };
   document.body.classList.add('navigating');
   $('#sheet-tag').textContent = '// NAVIGATING';
   $('#maneuver').hidden = false;
@@ -696,8 +700,10 @@ function engage() {
   sfx.confirm();
   glitch();
   navTick(S.fix);
-  const first = S.route.steps[0];
-  speak(`Route engaged. ${G.fmtDistSpoken(S.route.length)} to destination. ${first?.text ?? ''}`);
+  say(persona().engage({
+    dist: G.fmtDistSpoken(S.route.length), time: G.fmtDurSpoken(S.route.duration),
+    dest: S.dest.title, first: S.route.steps[0]?.text ?? '',
+  }));
   setFollow(true);
 }
 
@@ -707,7 +713,7 @@ function stopNav(announce = true) {
   $('#sheet-tag').textContent = '// ROUTE PLOTTED';
   $('#maneuver').hidden = true;
   syncWakeLock();
-  if (announce) speak('Navigation ended');
+  if (announce) say(persona().end());
   map.easeTo({ padding: navPadding(), pitch: S.is3d ? 50 : 0, duration: 800 });
 }
 
@@ -728,7 +734,7 @@ function navTick(fix) {
       glitch();
       sfx.alert();
       toast('ROUTE DEVIATION // RECALCULATING');
-      speak('Recalculating');
+      say(persona().reroute());
       computeRoute({ reroute: true });
       return;
     }
@@ -762,14 +768,16 @@ function navTick(fix) {
 function announce(idx, step, d, then) {
   const [early, prep, now] = PROMPTS[S.mode];
   const level = d <= now ? 2 : d <= prep ? 1 : d <= early ? 0 : -1;
-  if (level < 0) return;
+  if (level < 0 || (level < 2 && Date.now() < S.nav.quietUntil)) return;
   const key = `${idx}:${level}`;
   if (S.nav.announced.has(key)) return;
   for (let l = 0; l <= level; l++) S.nav.announced.add(`${idx}:${l}`);
-  let text = level === 2 ? step.text : `In ${G.fmtDistSpoken(d)}, ${lowerFirst(step.text)}`;
-  if (level === 2 && then) text += `, then ${lowerFirst(then.text)}`;
+  const P = persona();
+  const dist = G.fmtDistSpoken(d);
+  let text = level === 2 ? P.now(step.text) : level === 1 ? P.prepare(dist, lowerFirst(step.text)) : P.early(dist, lowerFirst(step.text));
+  if (level === 2 && then) text += ` Then ${lowerFirst(then.text)}.`;
   sfx.tick();
-  speak(text);
+  say(text);
 }
 const lowerFirst = (s) => s.charAt(0).toLowerCase() + s.slice(1);
 
@@ -789,7 +797,7 @@ function arrive() {
   S.nav = null;
   stopSim();
   sfx.arrive();
-  speak('You have arrived at your destination.');
+  say(persona().arrive({ dest: title || 'your destination' }));
   const el = $('#arrival');
   $('#arrival-sub').textContent = title.toUpperCase();
   el.hidden = false;
@@ -898,6 +906,7 @@ addEventListener('keydown', (e) => {
   else if (k === 't') $('#btn-3d').click();
   else if (k === 'm') $('#btn-audio').click();
   else if (k === 'd') $('#btn-dim').click();
+  else if (k === 'v') toggleVoices();
   else if (k === 'n') $('#compass').click();
   else if (k === 's' && S.route) toggleSim();
   else if (k === 'enter' && S.route && !S.nav) engage();
@@ -905,6 +914,59 @@ addEventListener('keydown', (e) => {
 });
 
 addEventListener('resize', () => { if (S.nav && S.follow) map.easeTo({ padding: navPadding(), duration: 300 }); });
+
+// ═══ navigator personas ═══════════════════════════════════════════
+const persona = () => personaById(S.persona);
+setVoiceProfile(persona().voice);
+
+// All navigator speech goes through here so the holo-call display tracks it.
+function say(text) {
+  const P = persona();
+  text = text.replace(/([.!?]\s+)([a-z])/g, (_, gap, ch) => gap + ch.toUpperCase());
+  speak(text, {
+    onstart: () => {
+      const el = $('#holo');
+      el.style.setProperty('--c', P.color);
+      $('#holo-glyph').textContent = P.glyph;
+      $('#holo-name').textContent = P.name;
+      el.hidden = false;
+    },
+    onend: () => { $('#holo').hidden = true; },
+  });
+}
+
+function renderVoices() {
+  $('#voice-list').innerHTML = PERSONAS.map((p) => {
+    const v = voiceFor(p.voice);
+    return `<li role="option" data-id="${p.id}" class="${p.id === S.persona ? 'sel' : ''}" style="--c:${p.color}">
+      <span class="v-glyph"><span>${p.glyph}</span></span>
+      <span class="v-body"><span class="v-name">${p.name}</span><span class="v-role">${esc(p.role)}</span></span>
+      <span class="v-voice mono">${v ? esc(v.name.replace(/^(Microsoft|Google)\s+/, '').split(/[\s(-]/)[0]) : '—'}</span>
+    </li>`;
+  }).join('');
+}
+
+function toggleVoices(open = $('#voices').hidden) {
+  $('#voices').hidden = !open;
+  $('#btn-voice').classList.toggle('on', open);
+  if (open) renderVoices();
+  sfx.click();
+}
+
+$('#btn-voice').onclick = () => toggleVoices();
+$('#voices-close').onclick = () => toggleVoices(false);
+$('#voice-list').addEventListener('click', (e) => {
+  const li = e.target.closest('li[data-id]');
+  if (!li) return;
+  S.persona = li.dataset.id;
+  store.set('persona', S.persona);
+  setVoiceProfile(persona().voice);
+  renderVoices();
+  sfx.confirm();
+  if (!S.audio) toast('AUDIO IS MUTED // TAP THE SPEAKER TO HEAR', 'err');
+  say(persona().greet());
+});
+window.speechSynthesis?.addEventListener?.('voiceschanged', () => { if (!$('#voices').hidden) renderVoices(); });
 
 // ═══ keep the screen on while tracking or navigating ═══════════════
 let wakeLock = null;

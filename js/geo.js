@@ -115,6 +115,13 @@ export function fmtDistSpoken(m) {
   return km < 10 ? `${km.toFixed(1)} kilometers` : `${Math.round(km)} kilometers`;
 }
 
+export function fmtDurSpoken(s) {
+  const min = Math.max(1, Math.round(s / 60));
+  if (min < 60) return `${min} minute${min === 1 ? '' : 's'}`;
+  const h = Math.floor(min / 60), m = min % 60;
+  return `${h} hour${h === 1 ? '' : 's'}${m ? ` ${m} minutes` : ''}`;
+}
+
 export function fmtDur(s) {
   if (s == null || !isFinite(s)) return '--';
   const min = Math.max(1, Math.round(s / 60));
